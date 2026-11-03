@@ -1,8 +1,10 @@
 import os
-import anthropic
+import time
+from google import genai
+from google.genai import errors
 
-client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from your environment
-MODEL = os.getenv("MODEL_NAME", "claude-sonnet-5-5")
+client = genai.Client()  # reads GEMINI_API_KEY from your environment
+MODEL = os.getenv("MODEL_NAME", "gemini-3.8-flash")
 
 
 def answer(question, context_chunks):
@@ -12,9 +14,11 @@ def answer(question, context_chunks):
         "If the answer is not in the context, say you don't know.\n\n"
         f"Context:\n{context}\n\nQuestion: {question}"
     )
-    msg = client.messages.create(
-        model=MODEL,
-        max_tokens=700,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return msg.content[0].text
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(model=MODEL, contents=prompt)
+            return response.text
+        except errors.ServerError:
+            if attempt == 2:
+                return "The AI service is busy right now. Please try again in a minute."
+            time.sleep(2 * (attempt + 1))
